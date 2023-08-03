@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Move to the root of the project
+cd "$(dirname "$0")"
+cd ..
+
+# Build rust
+rustc src/main.rs -o dist/main

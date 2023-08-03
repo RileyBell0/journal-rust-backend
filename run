@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Move to project root
+cd "$(dirname "$0")"
+
+# Run the build script
+bin/Build
+
+# Run the program
+dist/main
