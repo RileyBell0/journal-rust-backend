@@ -1,8 +1,10 @@
+pub mod account;
 pub mod auth;
 
+/// Example route. Used for testing connection
 #[get("/")]
 pub async fn hello() -> &'static str {
-    "Hello, world!"
+    "Hello rust!"
 }
 
 #[cfg(test)]
@@ -11,6 +13,7 @@ mod test {
     use rocket::http::Status;
     use rocket::local::blocking::Client;
 
+    //
     #[test]
     fn hello_world() {
         let client = Client::tracked(launch()).expect("valid rocket instance");

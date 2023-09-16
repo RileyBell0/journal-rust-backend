@@ -1,0 +1,2 @@
+#!/bin/bash
+cargo clippy --all-features --all --tests --examples -- -D clippy::all -D warnings

@@ -6,7 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rocket = { version = "=0.5.0-rc.3", features = ['tls']}
+argon2 = "0.5.2"
+async-oauth2 = "0.4.2"
+base64 = "0.21.4"
+openssl = "0.10.57"
+redis = "0.23.3"
+rocket = { version = "=0.5.0-rc.3", features = ["secrets"] }
 
 [dependencies.sqlx]
 version = "0.6"
