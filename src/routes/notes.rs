@@ -110,6 +110,7 @@ pub struct NoteOverview {
     id: i32,
     title: String,
     update_time: i64,
+    favourite: bool,
 }
 
 #[get("/notes")]
@@ -133,6 +134,7 @@ pub async fn get_all(
                     id: record.id,
                     title: record.title,
                     update_time: record.update_time,
+                    favourite: record.favourite,
                 });
             }
 
@@ -189,7 +191,7 @@ pub struct UpdateNote {
 pub struct SetFavourite {
     favourite: bool,
 }
-#[post("/notes/<note_id>", format = "json", data = "<favourite>")]
+#[post("/notes/<note_id>/favourite", format = "json", data = "<favourite>")]
 pub async fn set_favourite(
     favourite: Json<SetFavourite>,
     note_id: i32,
