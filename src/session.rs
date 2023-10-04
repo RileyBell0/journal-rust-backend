@@ -1,4 +1,4 @@
-use crate::db::{self, Connection, Db};
+use crate::db::{self};
 use base64::{engine::general_purpose, Engine as _};
 use rocket_db_pools::sqlx;
 
@@ -8,10 +8,12 @@ use rocket::{
     time::{Duration, OffsetDateTime},
     Request,
 };
+use sqlx::PgConnection;
 
 const SESSION_COOKIE_NAME: &str = "session";
 const SESSION_KEY_LEN: usize = 32;
 const SESSION_DEFAULT_EXPIRY_WEEKS: i64 = 4;
+const SESSION_PUBLIC_NAME: &str = "session_pub";
 
 pub struct Session {
     key: String,
@@ -23,16 +25,21 @@ impl Session {
         Session { user_id, key }
     }
 
-    pub fn init(user_id: i32) -> Session {
-        Session {
+    pub async fn init(user_id: i32, jar: &CookieJar<'_>, conn: &mut PgConnection) -> Session {
+        // TODO i don't really care about the lifetime on the cookie jar i just need it to survive this function's execution, why do i need to add it?
+        // TODO what should the lifetime be here?
+        // maybe i need to read up on tokio? does that explain these weird lifetimes?
+        let session = Session {
             user_id,
             key: Self::generate_key(),
-        }
+        };
+        session.attach(jar);
+        session.save(conn).await;
+        session
     }
 
     /// save the given session into the sessions table
-    pub async fn save(&self, conn: &mut Connection<Db>) -> bool {
-        let conn = conn.as_mut();
+    async fn save(&self, conn: &mut PgConnection) -> bool {
         let result = sqlx::query!(
             "INSERT INTO sessions (id, user_id) VALUES ($1, $2)",
             &self.key,
@@ -45,7 +52,7 @@ impl Session {
     }
 
     /// attaches this session to the given cooke jar
-    pub fn attach(&self, jar: &CookieJar) {
+    fn attach(&self, jar: &CookieJar) {
         let mut session_cookie = Cookie::new(SESSION_COOKIE_NAME, self.key.clone());
 
         let mut now = OffsetDateTime::now_utc();
@@ -53,16 +60,26 @@ impl Session {
 
         session_cookie.set_expires(now);
         jar.add_private(session_cookie);
+        jar.add(
+            Cookie::build(SESSION_PUBLIC_NAME, "authenticated")
+                .http_only(false)
+                .same_site(rocket::http::SameSite::Strict)
+                .finish(),
+        )
     }
 
     /// removes the session cookie (good for a logout route)
-    pub fn remove(&self, jar: &CookieJar) {
+    pub async fn delete(&self, jar: &CookieJar<'_>, conn: &mut PgConnection) -> bool {
+        if !self.remove_from_db(conn).await {
+            return false;
+        }
         jar.remove_private(Cookie::named(SESSION_COOKIE_NAME));
+        jar.remove(Cookie::named(SESSION_PUBLIC_NAME));
+        true
     }
 
     /// deletes the session from the db
-    pub async fn delete(&self, conn: &mut Connection<Db>) -> bool {
-        let conn = conn.as_mut();
+    async fn remove_from_db(&self, conn: &mut PgConnection) -> bool {
         let result = sqlx::query!("DELETE FROM sessions WHERE id = $1", &self.key)
             .execute(conn)
             .await;

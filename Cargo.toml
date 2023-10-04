@@ -11,7 +11,9 @@ async-oauth2 = "0.4.2"
 base64 = "0.21.4"
 openssl = "0.10.57"
 redis = "0.23.3"
-rocket = { version = "=0.5.0-rc.3", features = ["secrets"] }
+rocket = { version = "=0.5.0-rc.3", features = ["secrets", "json"] }
+rocket_contrib = { version = "0.4.11", features = ['json']}
+serde = "1.0.188"
 
 [dependencies.sqlx]
 version = "0.6"

@@ -44,7 +44,7 @@ pub async fn login(
     let user = match User::get_by_email(&mut conn, &login_details.email).await {
         Ok(user) => match user {
             Some(a) => a,
-            None => return Status::Unauthorized,
+            None => return Status::NotFound,
         },
         Err(_) => return Status::InternalServerError,
     };
@@ -54,9 +54,7 @@ pub async fn login(
         return Status::Unauthorized;
     }
 
-    let session = Session::init(user.id);
-    session.attach(jar);
-    session.save(&mut conn).await;
+    Session::init(user.id, jar, &mut conn).await;
 
     Status::Ok
 }
@@ -70,10 +68,8 @@ pub async fn logout(
 ) -> Status {
     match session {
         Some(session) => {
-            session.remove(jar);
-
             // Might fail to remove the session from the db
-            if !session.delete(&mut conn).await {
+            if !session.delete(jar, &mut conn).await {
                 return Status::InternalServerError;
             }
 
