@@ -37,3 +37,8 @@ DATABASE_URL="<REDACTED>"
 ```
 
 ## Running
+
+## Nginx quirks
+
+`sudo chown -R <your_admin_user>:admin client_body_temp/` might help if you're getting an error like this
+2023/10/12 14:57:55 [crit] 35613#0: *84629 open() "/opt/homebrew/var/run/nginx/client_body_temp/0000000092" failed (13: Permission denied), client: 127.0.0.1, server: dev.com, request: "POST /api/images HTTP/1.1", host: "dev.com", referrer: "https://dev.com/notes?id=165"

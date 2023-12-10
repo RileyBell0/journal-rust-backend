@@ -2,3 +2,4 @@
 /dist/*
 Rocket.toml
 .env
+.DS_Store

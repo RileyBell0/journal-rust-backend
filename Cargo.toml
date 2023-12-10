@@ -9,17 +9,18 @@ edition = "2021"
 argon2 = "0.5.2"
 async-oauth2 = "0.4.2"
 base64 = "0.21.4"
+chrono = "0.4.31"
 openssl = "0.10.57"
 redis = "0.23.3"
 rocket = { version = "=0.5.0-rc.3", features = ["secrets", "json"] }
+rocket-multipart-form-data = "0.10.6"
 rocket_contrib = { version = "0.4.11", features = ['json']}
 serde = "1.0.188"
+serde_json = "1.0.108"
+tokio = "1.35.0"
+toml = "0.8.8"
 
 [dependencies.sqlx]
 version = "0.6"
 default-features = false
-features = ["macros", "offline", "migrate"]
-
-[dependencies.rocket_db_pools]
-version = "=0.1.0-rc.3"
-features = ["sqlx_postgres"]
+features = ["macros", "offline", "migrate", "runtime-tokio-native-tls", "postgres"]

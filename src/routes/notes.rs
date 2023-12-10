@@ -1,245 +1,251 @@
-use crate::db::{user::User, Connection, Db};
-use rocket::{http::Status, response::status, serde::json::Json};
-use serde::{Deserialize, Serialize};
+use crate::db::{
+    self,
+    note::{self, CreateNoteInfo, Note, NoteOverview, UpdateNoteInfo},
+    user::User,
+};
+use rocket::{http::Status, response::status, serde::json::Json, State};
+use serde::Serialize;
+use sqlx::PgPool;
 
-/// Represents relevant public fields of a note
-#[derive(Serialize, Deserialize)]
-pub struct Note {
-    id: i32,
-    time: i64,
-    content: String,
-    title: String,
-}
-
-/// Updates the content of the note associated with the given user
-async fn update_note(
-    user_id: i32,
-    note_id: i32,
-    note_content: &str,
-    update_time: i64,
-    title: &str,
-    conn: &mut sqlx::PgConnection,
-) -> bool {
-    // TODO
-    // Couldn't connect to the database
-    // Couldn't find the row (nothing got updated)
-    // success
-    // result<Ok(true,false),sqlx::error>
-
-    // Insert a new note into the database
-    let res = sqlx::query!(
-        "UPDATE notes SET content = $1, title = $2, update_time = $3 WHERE id = $4 AND user_id = $5 AND update_time < $6",
-        note_content,
-        title,
-        update_time,
-        note_id,
-        user_id,
-        update_time,
-    )
-    .execute(conn)
-    .await;
-
-    match res {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-
-async fn delete_note(note_id: i32, user_id: i32, conn: &mut sqlx::PgConnection) -> bool {
-    let res = sqlx::query!(
-        "DELETE FROM notes WHERE id = $1 AND user_id = $2",
-        note_id,
-        user_id
-    )
-    .execute(conn)
-    .await;
-    match res {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-
-async fn set_note_favourite(
-    user_id: i32,
-    note_id: i32,
-    favourite: bool,
-    conn: &mut sqlx::PgConnection,
-) -> bool {
-    // Insert a new note into the database
-    let res = sqlx::query!(
-        "UPDATE notes SET favourite = $1 WHERE id = $2 AND user_id = $3",
-        favourite,
-        note_id,
-        user_id,
-    )
-    .execute(conn)
-    .await;
-
-    match res {
-        Ok(_) => true,
-        Err(_) => false,
-    }
-}
-
-async fn create_note(
-    user_id: i32,
-    note_content: &str,
-    update_time: i64,
-    title: &str,
-    conn: &mut sqlx::PgConnection,
-) -> Option<i32> {
-    // Insert a new note into the database
-    let res = sqlx::query!(
-        "INSERT INTO notes (user_id, content, update_time, title) VALUES ($1, $2, $3, $4) RETURNING id",
-        user_id,
-        note_content,
-        update_time,
-        title,
-    )
-    .fetch_one(conn)
-    .await;
-
-    match res {
-        Ok(record) => Some(record.id),
-        Err(_) => None,
-    }
-}
-
+/// Represents a generic paged response - the data and if there's more after this
 #[derive(Serialize)]
-pub struct NoteOverview {
-    id: i32,
-    title: String,
-    update_time: i64,
-    favourite: bool,
+pub struct PagedResponse<T> {
+    data: T,
+    more: bool,
 }
 
-#[get("/notes")]
-pub async fn get_all(
-    mut conn: Connection<Db>,
-    user: User,
-) -> status::Custom<Option<Json<Vec<NoteOverview>>>> {
-    let res = sqlx::query!(
-        "SELECT id, title, update_time, favourite FROM notes WHERE user_id = $1 ORDER BY id",
-        user.id
-    )
-    .fetch_all(conn.as_mut())
-    .await;
-
-    match res {
-        Err(_) => status::Custom(Status::InternalServerError, None),
-        Ok(records) => {
-            let mut entries = Vec::with_capacity(records.len());
-            for record in records {
-                entries.push(NoteOverview {
-                    id: record.id,
-                    title: record.title,
-                    update_time: record.update_time,
-                    favourite: record.favourite,
-                });
-            }
-
-            status::Custom(Status::Ok, Some(Json(entries)))
-        }
-    }
-}
-
-#[get("/notes/<note_id>")]
-pub async fn get_one(
-    note_id: i32,
-    mut conn: Connection<Db>,
-    user: User,
-) -> status::Custom<Option<Json<Note>>> {
-    let res = sqlx::query!(
-        "SELECT id, content, update_time, title FROM notes WHERE id = $1 AND user_id = $2",
-        note_id,
-        user.id
-    )
-    .fetch_one(conn.as_mut())
-    .await;
-
-    match res {
-        Err(_) => status::Custom(Status::InternalServerError, None),
-        Ok(record) => status::Custom(
-            Status::Ok,
-            Some(Json(Note {
-                id: record.id,
-                content: record.content,
-                time: record.update_time,
-                title: record.title,
-            })),
-        ),
-    }
-}
-
-#[delete("/notes/<note_id>")]
-pub async fn delete(note_id: i32, user: User, mut conn: Connection<Db>) -> Status {
-    if !delete_note(note_id, user.id, conn.as_mut()).await {
-        return Status::InternalServerError;
-    }
-    Status::Ok
-}
-
-/// Required data for updating a note
-#[derive(Deserialize)]
-pub struct UpdateNote {
-    content: String,
-    title: String,
-    time: i64,
-}
-
-#[derive(Deserialize)]
-pub struct SetFavourite {
-    favourite: bool,
-}
-#[post("/notes/<note_id>/favourite", format = "json", data = "<favourite>")]
-pub async fn set_favourite(
-    favourite: Json<SetFavourite>,
-    note_id: i32,
-    mut conn: Connection<Db>,
-    user: User,
-) -> Status {
-    if !set_note_favourite(user.id, note_id, favourite.favourite, &mut conn).await {
-        return Status::InternalServerError;
-    }
-
-    Status::Ok
-}
-
-/// Updates the content of the given note
-#[post("/notes/<note_id>", format = "json", data = "<note>")]
-pub async fn update(
-    note: Json<UpdateNote>,
-    note_id: i32,
-    mut conn: Connection<Db>,
-    user: User,
-) -> Status {
-    if !update_note(
-        user.id,
-        note_id,
-        &note.content,
-        note.time,
-        &note.title,
-        &mut conn,
-    )
-    .await
-    {
-        return Status::InternalServerError;
-    }
-
-    Status::Ok
-}
-
-/// Returns the id of the newly created note
-#[post("/notes", format = "json", data = "<note>")]
+/// Creates a new note, returning the ID of the new note
+///
+/// ### Arguments
+///
+/// * `create` - the information required to create the note
+/// * `pool` - a pool of connections to the database we want to create the note in
+/// * `user` - the user creating the note
+#[post("/", format = "json", data = "<create>")]
 pub async fn create(
-    note: Json<UpdateNote>,
-    mut conn: Connection<Db>,
+    create: Json<CreateNoteInfo>,
+    pool: &State<PgPool>,
     user: User,
 ) -> status::Custom<Option<Json<i32>>> {
-    let id = create_note(user.id, &note.content, note.time, &note.title, &mut conn).await;
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
 
-    if let Some(id) = id {
-        return status::Custom(Status::Created, Some(Json(id)));
+    // Create the note, returning the ID of the created note on success, or an error on failure
+    match note::create(conn, user.id, &create).await {
+        Err(_) => status::Custom(Status::InternalServerError, None),
+        Ok(id) => status::Custom(Status::Created, Some(Json(id))),
     }
-    status::Custom(Status::InternalServerError, None)
+}
+
+/// Gets the note with the specified ID
+///
+/// ### Arguments
+///
+/// * `note_id` - the id of the note we're wanting to fetch
+/// * `pool` - connections to the database where our note is stored
+/// * `user` - the user that's making the request
+///
+/// ### Returns
+///
+/// * `Status::InternalServerError` if we couldn't get the note, or we failed to contact the database
+/// * `Status::NotFound` if no such note with the given id exists for the user
+/// * `Status::Ok` if we got the note, and the json encoded note itself
+#[get("/<note_id>")]
+pub async fn get(
+    note_id: i32,
+    pool: &State<PgPool>,
+    user: User,
+) -> status::Custom<Option<Json<Note>>> {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
+
+    // attempt to get the note, and return
+    match note::get(conn, user.id, note_id).await {
+        Ok(Some(note)) => status::Custom(Status::Ok, Some(Json(note))),
+        Ok(None) => status::Custom(Status::NotFound, None),
+        Err(_) => status::Custom(Status::InternalServerError, None),
+    }
+}
+
+/// Gets the data for multiple notes at once, batched in sizes of page_size
+///
+/// ### Arguments
+///
+/// * `pool` - connections to the db that's storing our notes
+/// * `user` - the user who's making the requeset
+/// * `page` - the numbered page we're hoping to get data for
+/// * `page_size` - how many results in each page
+///
+/// ### Returns
+///
+/// * `status::InternalServerError` when we failed to reach thedb, or couldn't get the notes
+/// * `status::BadRequest` if an invalid pagesize was returned
+/// * `status::Ok` and a json-encoded vector of notes, and a bool for if there's more results on success
+#[get("/?<page>&<page_size>")]
+pub async fn get_many(
+    pool: &State<PgPool>,
+    user: User,
+    page: i32,
+    page_size: Option<i32>,
+) -> status::Custom<Option<Json<PagedResponse<Vec<Note>>>>> {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
+
+    // Validate input parameter
+    let page_size = match note::PageSize::new(page_size.unwrap_or(20)) {
+        Ok(page_size) => page_size,
+        Err(_) => return status::Custom(Status::BadRequest, None),
+    };
+
+    // Fetch and return
+    match note::get_many(conn, user.id, page, page_size).await {
+        Ok(notes) => status::Custom(
+            Status::Ok,
+            Some(Json(PagedResponse {
+                data: notes.0,
+                more: notes.1,
+            })),
+        ),
+        Err(_) => status::Custom(Status::InternalServerError, None),
+    }
+}
+
+/// Gets the overview for the note with the specified id
+///
+/// ### Arguments
+///
+/// * `note_id` - the ID of the note we're retrieving
+/// * `pool` - a pool of connections to the database where the note is located
+/// * `user` - the user making the request / the user that owns the note
+///
+/// ### Returns
+///
+/// `Status::InternalServerError` if we failed to contact the database
+/// `Status::NotFound` if no such note exists for the given user
+/// `Status::Ok` if we found the note, with the note overview attached (and json encoded)
+#[get("/<note_id>/overview")]
+pub async fn get_overview(
+    note_id: i32,
+    pool: &State<PgPool>,
+    user: User,
+) -> status::Custom<Option<Json<NoteOverview>>> {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
+
+    // Grab the overview, or throw the relevant error on failure
+    match note::get_overview(conn, user.id, note_id).await {
+        Ok(Some(note_overview)) => status::Custom(Status::Ok, Some(Json(note_overview))),
+        Ok(None) => status::Custom(Status::NotFound, None),
+        Err(_) => status::Custom(Status::InternalServerError, None),
+    }
+}
+
+/// Gets multiple note overviews, batched in sizes of page_size
+///
+/// ### Arguments
+///
+/// * `pool` - connections to the db that's storing our notes
+/// * `user` - the user who's making the requeset
+/// * `page` - the numbered page we're hoping to get data for
+/// * `page_size` - how many results in each page
+///
+/// ### Returns
+///
+/// * `status::InternalServerError` when we failed to reach thedb, or couldn't get the notes
+/// * `status::BadRequest` if an invalid pagesize was returned
+/// * `status::Ok` and a json-encoded vector of notes, and a bool for if there's more results on success
+#[get("/?<page>&<page_size>&overview=true")]
+pub async fn get_overview_many(
+    pool: &State<PgPool>,
+    user: User,
+    page: i32,
+    page_size: Option<i32>,
+) -> status::Custom<Option<Json<PagedResponse<Vec<NoteOverview>>>>> {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
+
+    // Validate input parameter
+    let page_size = match note::PageSize::new(page_size.unwrap_or(20)) {
+        Ok(page_size) => page_size,
+        Err(_) => return status::Custom(Status::BadRequest, None),
+    };
+
+    // Fetch and return
+    match note::get_overview_many(conn, user.id, page, page_size).await {
+        Ok(notes) => status::Custom(
+            Status::Ok,
+            Some(Json(PagedResponse {
+                data: notes.0,
+                more: notes.1,
+            })),
+        ),
+        Err(_) => status::Custom(Status::InternalServerError, None),
+    }
+}
+
+/// Delete the note with the given id owned by the provided user
+///
+/// ### Arguments
+///
+/// * `note_id` - the ID of the note to be deleted
+/// * `pool` - a pool of connections to the database where the note is stored
+/// * `user` - the user who owns the note / is executing the request
+///
+/// ### Returns
+///
+/// * `Status::InternalServerError` if we failed to contact the database
+/// * `Status::NotFound` if no such note could be found
+/// * `Status::Ok` if the note was successfully deleted
+#[delete("/<note_id>")]
+pub async fn delete(note_id: i32, pool: &State<PgPool>, user: User) -> Status {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return Status::InternalServerError,
+    };
+
+    // Attempt to delete the specified note, then return the status of said deletion
+    match note::delete(note_id, user.id, conn).await {
+        Err(_) => Status::InternalServerError,
+        Ok(false) => Status::NotFound,
+        Ok(true) => Status::Ok,
+    }
+}
+
+/// Update the given note
+///
+/// ### Arguments
+///
+/// * `note_id` - the id of the note we're updating
+/// * `update` - the update package, containing only the fields we're hoping to update
+/// * `pool` - a pool of connections to the database in which the note is stored
+/// * `user` - the user who owns the note / the user who's making the request
+#[patch("/<note_id>", format = "json", data = "<update>")]
+pub async fn update(
+    note_id: i32,
+    update: Json<UpdateNoteInfo>,
+    pool: &State<PgPool>,
+    user: User,
+) -> Status {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return Status::InternalServerError,
+    };
+
+    // Perform the update
+    match note::update(conn, user.id, note_id, &update).await {
+        Err(_) => Status::InternalServerError, // failed to talk to the db
+        Ok(Some(false)) => Status::InternalServerError, // failed to update
+        Ok(None) => Status::NotFound,          // no such note exists
+        Ok(Some(true)) => Status::Ok,          // success
+    }
 }

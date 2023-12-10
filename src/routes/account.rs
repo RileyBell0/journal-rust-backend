@@ -1,11 +1,10 @@
-use crate::{
-    db::{self, user::User},
-    session::Session,
-};
+use crate::{db::user::User, session::Session};
 use rocket::{
     form::Form,
     http::{CookieJar, Status},
+    State,
 };
+use sqlx::PgPool;
 
 /// Information about an account required to login / sign up
 #[derive(FromForm)]
@@ -16,41 +15,47 @@ pub struct SignupForm {
     password: String,
 }
 
-/// Signs up a new user.
+/// Signs up a new user with the provided details
 ///
-/// Returns [`Status::Created`] on success (a new user is created)
+/// ### Arguments
 ///
-/// # Errors
+/// * `session` - The session of the currently logged in user - you're not allowed to make a new user whilst logged in
+/// * `user_info` - the email and plaintext password of the new user
+/// * `jar` - the jar we'll be storing the user's session in once they've been created
+/// * `pool` - a pool of connections to the db we're going to store the new user
 ///
-/// Returns [`Status::InternalServerError`] if it fails to access the database
+/// ### Returns
 ///
-/// Returns [`Status::Conflict`] if a user with that email already exists
-///
+/// Status::Created on success, Status::InternalServerError if it fails to access
+/// the db, or Status::Conflict if a user with the given details already exists
 #[post("/user", data = "<user_info>")]
 pub async fn signup(
     user_info: Form<SignupForm>,
-    mut conn: db::Connection<db::Db>,
     jar: &CookieJar<'_>,
     session: Option<Session>,
-) -> Status {
+    pool: &State<PgPool>,
+) -> Result<Status, Status> {
     // If they're currently logged in, tell them NO
     if session.is_some() {
-        return Status::BadRequest;
+        return Err(Status::BadRequest);
     }
 
     // Ensure we don't have an existing user with that email
+    let mut conn = crate::db::acquire_conn(pool.inner()).await?;
     let existing_user = User::email_taken(&mut conn, &user_info.email).await;
     let existing_user = match existing_user {
         Ok(a) => a,
-        Err(_) => return Status::InternalServerError,
+        Err(_) => return Err(Status::InternalServerError),
     };
     if existing_user {
-        return Status::Conflict;
+        return Err(Status::Conflict);
     }
 
     // Create the user
-    if !User::create(&mut conn, &user_info.email, &user_info.password).await {
-        return Status::InternalServerError;
+    // if it's Err() or it's Ok(false)
+    let res = User::create(&mut conn, &user_info.email, &user_info.password).await;
+    if res.is_err() || res.is_ok_and(|x| x == false) {
+        return Err(Status::InternalServerError);
     }
 
     // Get the user's ID so we can make a sessino for them
@@ -59,5 +64,5 @@ pub async fn signup(
         Session::init(user.id, jar, &mut conn).await;
     }
 
-    Status::Created
+    Ok(Status::Created)
 }
