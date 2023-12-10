@@ -327,7 +327,7 @@ pub async fn update(
     // Perform the update
     let update_time = now();
     let res = sqlx::query!(
-        "UPDATE notes SET content = $1, title = $2, update_time = $3, favourite = $4 WHERE id = $5 AND user_id = $6 AND update_time < $3",
+        "UPDATE notes SET content = $1, title = $2, update_time = $3, favourite = $4 WHERE id = $5 AND user_id = $6",
         update.content.as_ref().unwrap_or_else(|| &current.content),
         update.title.as_ref().unwrap_or_else(|| &current.title),
         update_time,
