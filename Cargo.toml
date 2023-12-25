@@ -23,4 +23,4 @@ toml = "0.8.8"
 [dependencies.sqlx]
 version = "0.6"
 default-features = false
-features = ["macros", "offline", "migrate", "runtime-tokio-native-tls", "postgres"]
+features = ["macros", "offline", "migrate", "runtime-tokio-native-tls", "postgres", "time"]

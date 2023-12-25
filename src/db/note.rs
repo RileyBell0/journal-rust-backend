@@ -34,6 +34,7 @@ pub struct Note {
     title: String,
     content: String,
     is_diary: bool,
+    created_at: String,
 }
 impl Note {
     /// Creates a new note
@@ -52,6 +53,7 @@ impl Note {
         favourite: bool,
         content: String,
         is_diary: bool,
+        created_at: String,
     ) -> Note {
         Note {
             id,
@@ -60,6 +62,7 @@ impl Note {
             favourite,
             content,
             is_diary,
+            created_at,
         }
     }
 }
@@ -72,6 +75,7 @@ pub struct NoteOverview {
     favourite: bool,
     title: String,
     is_diary: bool,
+    created_at: String,
 }
 impl NoteOverview {
     /// Creates a new note overview
@@ -88,6 +92,7 @@ impl NoteOverview {
         update_time: i64,
         favourite: bool,
         is_diary: bool,
+        created_at: String,
     ) -> NoteOverview {
         NoteOverview {
             id,
@@ -95,6 +100,7 @@ impl NoteOverview {
             update_time,
             favourite,
             is_diary,
+            created_at,
         }
     }
 }
@@ -131,7 +137,7 @@ pub async fn get_diary_notes(
     page_size: PageSize,
 ) -> Result<(Vec<Note>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id desc LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, content, created_at FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id desc LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
@@ -158,6 +164,7 @@ pub async fn get_diary_notes(
                 record.favourite,
                 record.content,
                 true,
+                record.created_at.to_string(),
             )
         })
         .collect();
@@ -183,7 +190,7 @@ pub async fn get_overview(
     note_id: i32,
 ) -> Result<Option<NoteOverview>, sqlx::Error> {
     let record = sqlx::query!(
-        "SELECT id, title, update_time, favourite, is_diary FROM notes WHERE user_id = $1 AND id = $2",
+        "SELECT id, title, update_time, favourite, is_diary, created_at FROM notes WHERE user_id = $1 AND id = $2",
         user_id,
         note_id
     )
@@ -203,6 +210,7 @@ pub async fn get_overview(
         record.update_time,
         record.favourite,
         record.is_diary,
+        record.created_at.to_string(),
     )))
 }
 
@@ -227,7 +235,7 @@ pub async fn get_overview_many(
     page_size: PageSize,
 ) -> Result<(Vec<NoteOverview>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, is_diary FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, is_diary, created_at FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
@@ -253,6 +261,7 @@ pub async fn get_overview_many(
                 record.update_time,
                 record.favourite,
                 record.is_diary,
+                record.created_at.to_string(),
             )
         })
         .collect();
@@ -278,7 +287,7 @@ pub async fn get(
     note_id: i32,
 ) -> Result<Option<Note>, sqlx::Error> {
     let record = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content, is_diary FROM notes WHERE user_id = $1 AND id = $2",
+        "SELECT id, title, update_time, favourite, content, is_diary, created_at FROM notes WHERE user_id = $1 AND id = $2",
         user_id,
         note_id
     )
@@ -299,6 +308,7 @@ pub async fn get(
         record.favourite,
         record.content,
         record.is_diary,
+        record.created_at.to_string(),
     )))
 }
 
@@ -323,7 +333,7 @@ pub async fn get_many(
     page_size: PageSize,
 ) -> Result<(Vec<Note>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content, is_diary FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, content, is_diary, created_at FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
@@ -350,6 +360,7 @@ pub async fn get_many(
                 record.favourite,
                 record.content,
                 record.is_diary,
+                record.created_at.to_string(),
             )
         })
         .collect();
@@ -470,5 +481,6 @@ pub async fn create(
         record.favourite,
         record.content,
         record.is_diary,
+        record.created_at.to_string(),
     ))
 }
