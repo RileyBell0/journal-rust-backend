@@ -138,7 +138,7 @@ pub async fn get_diary_notes(
     page_size: PageSize,
 ) -> Result<(Vec<Note>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content, created_at FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id desc LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, content, created_at FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY created_at desc LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
