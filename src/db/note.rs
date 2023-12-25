@@ -1,5 +1,6 @@
 use crate::db::DbConn;
 use chrono::Utc;
+use rocket::time::format_description::well_known;
 use serde::{Deserialize, Serialize};
 
 /// A type-safe integer for the number of notes we're allowed to select at once
@@ -164,7 +165,10 @@ pub async fn get_diary_notes(
                 record.favourite,
                 record.content,
                 true,
-                record.created_at.to_string(),
+                record
+                    .created_at
+                    .format(&well_known::Iso8601::DEFAULT)
+                    .unwrap(),
             )
         })
         .collect();
@@ -210,7 +214,10 @@ pub async fn get_overview(
         record.update_time,
         record.favourite,
         record.is_diary,
-        record.created_at.to_string(),
+        record
+            .created_at
+            .format(&well_known::Iso8601::DEFAULT)
+            .unwrap(),
     )))
 }
 
@@ -261,7 +268,10 @@ pub async fn get_overview_many(
                 record.update_time,
                 record.favourite,
                 record.is_diary,
-                record.created_at.to_string(),
+                record
+                    .created_at
+                    .format(&well_known::Iso8601::DEFAULT)
+                    .unwrap(),
             )
         })
         .collect();
@@ -308,7 +318,10 @@ pub async fn get(
         record.favourite,
         record.content,
         record.is_diary,
-        record.created_at.to_string(),
+        record
+            .created_at
+            .format(&well_known::Iso8601::DEFAULT)
+            .unwrap(),
     )))
 }
 
@@ -360,7 +373,10 @@ pub async fn get_many(
                 record.favourite,
                 record.content,
                 record.is_diary,
-                record.created_at.to_string(),
+                record
+                    .created_at
+                    .format(&well_known::Iso8601::DEFAULT)
+                    .unwrap(),
             )
         })
         .collect();
@@ -481,6 +497,9 @@ pub async fn create(
         record.favourite,
         record.content,
         record.is_diary,
-        record.created_at.to_string(),
+        record
+            .created_at
+            .format(&well_known::Iso8601::DEFAULT)
+            .unwrap(),
     ))
 }
