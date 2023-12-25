@@ -114,6 +114,7 @@ pub struct CreateNoteInfo {
     title: Option<String>,
     content: String,
     favourite: Option<bool>,
+    is_diary: Option<bool>,
 }
 
 /// Gets the current timestamp
@@ -130,7 +131,7 @@ pub async fn get_diary_notes(
     page_size: PageSize,
 ) -> Result<(Vec<Note>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id desc LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
@@ -451,12 +452,13 @@ pub async fn create(
 ) -> Result<Note, sqlx::Error> {
     // Insert a new note into the database
     let record = sqlx::query!(
-        "INSERT INTO notes (user_id, content, update_time, title, favourite) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+        "INSERT INTO notes (user_id, content, update_time, title, favourite, is_diary) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
         user_id,
         note.content,
         now(),
         note.title.as_deref().unwrap_or(""),
-        note.favourite.unwrap_or(false)
+        note.favourite.unwrap_or(false),
+        note.is_diary.unwrap_or(false)
     )
     .fetch_one(&mut conn)
     .await?; // if fetch_one fails, something went wrong internally and the note wasn't created
