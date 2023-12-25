@@ -82,6 +82,7 @@ pub fn launch() -> Rocket<Build> {
                 notes::get_overview_many,
                 notes::update,
                 notes::delete,
+                notes::get_diary_many
             ],
         )
         .mount("/api/images", routes![images::upload, images::get])

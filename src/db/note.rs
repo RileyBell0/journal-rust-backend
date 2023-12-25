@@ -33,6 +33,7 @@ pub struct Note {
     favourite: bool,
     title: String,
     content: String,
+    is_diary: bool,
 }
 impl Note {
     /// Creates a new note
@@ -44,13 +45,21 @@ impl Note {
     /// * `update_time` - The timestamp of when the note was last updated
     /// * `favourite` - if the note has been favourited
     /// * `content` - The encoded string content of the note
-    pub fn new(id: i32, title: String, update_time: i64, favourite: bool, content: String) -> Note {
+    pub fn new(
+        id: i32,
+        title: String,
+        update_time: i64,
+        favourite: bool,
+        content: String,
+        is_diary: bool,
+    ) -> Note {
         Note {
             id,
             title,
             update_time,
             favourite,
             content,
+            is_diary,
         }
     }
 }
@@ -62,6 +71,7 @@ pub struct NoteOverview {
     update_time: i64,
     favourite: bool,
     title: String,
+    is_diary: bool,
 }
 impl NoteOverview {
     /// Creates a new note overview
@@ -72,12 +82,19 @@ impl NoteOverview {
     /// * `title` - The title of the note
     /// * `update_time` - The timestamp of when the note was last updated
     /// * `favourite` - if the note has been favourited
-    pub fn new(id: i32, title: String, update_time: i64, favourite: bool) -> NoteOverview {
+    pub fn new(
+        id: i32,
+        title: String,
+        update_time: i64,
+        favourite: bool,
+        is_diary: bool,
+    ) -> NoteOverview {
         NoteOverview {
             id,
             title,
             update_time,
             favourite,
+            is_diary,
         }
     }
 }
@@ -101,165 +118,19 @@ pub struct CreateNoteInfo {
 
 /// Gets the current timestamp
 fn now() -> i64 {
-    Utc::now().timestamp()
+    Utc::now().timestamp_millis()
 }
 
-/// Gets the overview of the note with the requested id owned by the given user
-///
-/// ### Arguments
-///
-/// * `conn` - A connection to the database storing the note
-/// * `user_id` - The id of the user that owns the note
-/// * `note_id` - The id of the note itself
-///
-/// ### Returns
-///
-/// Error if we failed to contact the database, None if no note could be found
-/// with the given id, or the Note's overview on success
-pub async fn get_overview(
-    mut conn: DbConn,
-    user_id: i32,
-    note_id: i32,
-) -> Result<Option<NoteOverview>, sqlx::Error> {
-    let record = sqlx::query!(
-        "SELECT id, title, update_time, favourite FROM notes WHERE user_id = $1 AND id = $2",
-        user_id,
-        note_id
-    )
-    .fetch_one(&mut conn)
-    .await;
-
-    // Ensure we found a note
-    if let Err(sqlx::Error::RowNotFound) = record {
-        return Ok(None);
-    }
-
-    // Return the note (or throw an error if we failed to get anything)
-    let record = record?;
-    Ok(Some(NoteOverview::new(
-        record.id,
-        record.title,
-        record.update_time,
-        record.favourite,
-    )))
-}
-
-/// Gets the requested number of note overviews at the given page
-///
-/// ### Arguments
-///
-/// * `conn` - The connection to the database in which the notes are stored
-/// * `user_id` - The user id whose note overviews we should be fetching
-/// * `page` - The page number we're hoping to grab note overviews from
-/// * `page_size` - The max number of note overviews per page
-///
-/// ### Returns
-///
-/// Error if we failed to contact the database, otherwise a tuple of the
-/// requested page of results, and a boolean of true if there's still more
-/// results, or false if we've hit the end
-pub async fn get_overview_many(
-    mut conn: DbConn,
-    user_id: i32,
-    page: i32,
-    page_size: PageSize,
-) -> Result<(Vec<NoteOverview>, bool), sqlx::Error> {
-    let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
-        user_id,
-        (page_size.0 + 1) as i64,
-        page as i64
-    )
-    .fetch_all(&mut conn)
-    .await?;
-
-    // Have we hit the last result?
-    let more_available = records.len() as i32 == (page_size.0 + 1);
-
-    // Remove our buffer elem for testing if we've got more results
-    if more_available {
-        records.pop();
-    }
-
-    // Convert our records into note overviews
-    let overviews = records
-        .into_iter()
-        .map(|record| {
-            NoteOverview::new(
-                record.id,
-                record.title,
-                record.update_time,
-                record.favourite,
-            )
-        })
-        .collect();
-
-    Ok((overviews, more_available))
-}
-
-/// Gets the note with the requested id owned by the given user
-///
-/// ### Arguments
-///
-/// * `conn` - A connection to the database storing the note
-/// * `user_id` - The id of the user that owns the note
-/// * `note_id` - The id of the note itself
-///
-/// ### Returns
-///
-/// Error if we failed to contact the database, None if no note could be found
-/// with the given id, or the Note on success
-pub async fn get(
-    mut conn: DbConn,
-    user_id: i32,
-    note_id: i32,
-) -> Result<Option<Note>, sqlx::Error> {
-    let record = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 AND id = $2",
-        user_id,
-        note_id
-    )
-    .fetch_one(&mut conn)
-    .await;
-
-    // Ensure we found a note
-    if let Err(sqlx::Error::RowNotFound) = record {
-        return Ok(None);
-    }
-
-    // Return the note (or throw an error if we failed to get anything)
-    let record = record?;
-    Ok(Some(Note::new(
-        record.id,
-        record.title,
-        record.update_time,
-        record.favourite,
-        record.content,
-    )))
-}
-
-/// Gets the requested number of notes at the given page
-///
-/// ### Arguments
-///
-/// * `conn` - The connection to the database in which the notes are stored
-/// * `user_id` - The user id whose notes we should be fetching
-/// * `page` - The page number we're hoping to grab notes from
-/// * `page_size` - The max number of notes per page
-///
-/// ### Returns
-///
-/// Error if we failed to contact the database, otherwise a tuple of the
-/// requested page of results, and a boolean of true if there's still more
-/// results, or false if we've hit the end
-pub async fn get_many(
+/// Grab pages of notes where is_diary is true <- the way we determine if a note
+/// is just a note, or if it's also a diary entry
+pub async fn get_diary_notes(
     mut conn: DbConn,
     user_id: i32,
     page: i32,
     page_size: PageSize,
 ) -> Result<(Vec<Note>, bool), sqlx::Error> {
     let mut records = sqlx::query!(
-        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+        "SELECT id, title, update_time, favourite, content FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY id LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
         page as i64
@@ -285,6 +156,199 @@ pub async fn get_many(
                 record.update_time,
                 record.favourite,
                 record.content,
+                true,
+            )
+        })
+        .collect();
+
+    Ok((overviews, more_available))
+}
+
+/// Gets the overview of the note with the requested id owned by the given user
+///
+/// ### Arguments
+///
+/// * `conn` - A connection to the database storing the note
+/// * `user_id` - The id of the user that owns the note
+/// * `note_id` - The id of the note itself
+///
+/// ### Returns
+///
+/// Error if we failed to contact the database, None if no note could be found
+/// with the given id, or the Note's overview on success
+pub async fn get_overview(
+    mut conn: DbConn,
+    user_id: i32,
+    note_id: i32,
+) -> Result<Option<NoteOverview>, sqlx::Error> {
+    let record = sqlx::query!(
+        "SELECT id, title, update_time, favourite, is_diary FROM notes WHERE user_id = $1 AND id = $2",
+        user_id,
+        note_id
+    )
+    .fetch_one(&mut conn)
+    .await;
+
+    // Ensure we found a note
+    if let Err(sqlx::Error::RowNotFound) = record {
+        return Ok(None);
+    }
+
+    // Return the note (or throw an error if we failed to get anything)
+    let record = record?;
+    Ok(Some(NoteOverview::new(
+        record.id,
+        record.title,
+        record.update_time,
+        record.favourite,
+        record.is_diary,
+    )))
+}
+
+/// Gets the requested number of note overviews at the given page
+///
+/// ### Arguments
+///
+/// * `conn` - The connection to the database in which the notes are stored
+/// * `user_id` - The user id whose note overviews we should be fetching
+/// * `page` - The page number we're hoping to grab note overviews from
+/// * `page_size` - The max number of note overviews per page
+///
+/// ### Returns
+///
+/// Error if we failed to contact the database, otherwise a tuple of the
+/// requested page of results, and a boolean of true if there's still more
+/// results, or false if we've hit the end
+pub async fn get_overview_many(
+    mut conn: DbConn,
+    user_id: i32,
+    page: i32,
+    page_size: PageSize,
+) -> Result<(Vec<NoteOverview>, bool), sqlx::Error> {
+    let mut records = sqlx::query!(
+        "SELECT id, title, update_time, favourite, is_diary FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+        user_id,
+        (page_size.0 + 1) as i64,
+        page as i64
+    )
+    .fetch_all(&mut conn)
+    .await?;
+
+    // Have we hit the last result?
+    let more_available = records.len() as i32 == (page_size.0 + 1);
+
+    // Remove our buffer elem for testing if we've got more results
+    if more_available {
+        records.pop();
+    }
+
+    // Convert our records into note overviews
+    let overviews = records
+        .into_iter()
+        .map(|record| {
+            NoteOverview::new(
+                record.id,
+                record.title,
+                record.update_time,
+                record.favourite,
+                record.is_diary,
+            )
+        })
+        .collect();
+
+    Ok((overviews, more_available))
+}
+
+/// Gets the note with the requested id owned by the given user
+///
+/// ### Arguments
+///
+/// * `conn` - A connection to the database storing the note
+/// * `user_id` - The id of the user that owns the note
+/// * `note_id` - The id of the note itself
+///
+/// ### Returns
+///
+/// Error if we failed to contact the database, None if no note could be found
+/// with the given id, or the Note on success
+pub async fn get(
+    mut conn: DbConn,
+    user_id: i32,
+    note_id: i32,
+) -> Result<Option<Note>, sqlx::Error> {
+    let record = sqlx::query!(
+        "SELECT id, title, update_time, favourite, content, is_diary FROM notes WHERE user_id = $1 AND id = $2",
+        user_id,
+        note_id
+    )
+    .fetch_one(&mut conn)
+    .await;
+
+    // Ensure we found a note
+    if let Err(sqlx::Error::RowNotFound) = record {
+        return Ok(None);
+    }
+
+    // Return the note (or throw an error if we failed to get anything)
+    let record = record?;
+    Ok(Some(Note::new(
+        record.id,
+        record.title,
+        record.update_time,
+        record.favourite,
+        record.content,
+        record.is_diary,
+    )))
+}
+
+/// Gets the requested number of notes at the given page
+///
+/// ### Arguments
+///
+/// * `conn` - The connection to the database in which the notes are stored
+/// * `user_id` - The user id whose notes we should be fetching
+/// * `page` - The page number we're hoping to grab notes from
+/// * `page_size` - The max number of notes per page
+///
+/// ### Returns
+///
+/// Error if we failed to contact the database, otherwise a tuple of the
+/// requested page of results, and a boolean of true if there's still more
+/// results, or false if we've hit the end
+pub async fn get_many(
+    mut conn: DbConn,
+    user_id: i32,
+    page: i32,
+    page_size: PageSize,
+) -> Result<(Vec<Note>, bool), sqlx::Error> {
+    let mut records = sqlx::query!(
+        "SELECT id, title, update_time, favourite, content, is_diary FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
+        user_id,
+        (page_size.0 + 1) as i64,
+        page as i64
+    )
+    .fetch_all(&mut conn)
+    .await?;
+
+    // Have we hit the last result?
+    let more_available = records.len() as i32 == (page_size.0 + 1);
+
+    // Remove our buffer elem for testing if we've got more results
+    if more_available {
+        records.pop();
+    }
+
+    // Convert our records into note overviews
+    let overviews = records
+        .into_iter()
+        .map(|record| {
+            Note::new(
+                record.id,
+                record.title,
+                record.update_time,
+                record.favourite,
+                record.content,
+                record.is_diary,
             )
         })
         .collect();
@@ -303,13 +367,13 @@ pub async fn get_many(
 ///
 /// # Returns
 /// Error if we failed to contact the database, None if no note could be found to update.
-/// If a note was found, return true on success, false on failure to update
+/// If a note was found, return the update time we've set on success, None on failure to update
 pub async fn update(
     mut conn: DbConn,
     user_id: i32,
     note_id: i32,
     update: &UpdateNoteInfo,
-) -> Result<Option<bool>, sqlx::Error> {
+) -> Result<Option<Option<i64>>, sqlx::Error> {
     // Grab the current state
     let res = sqlx::query!(
         "SELECT * FROM notes WHERE user_id = $1 AND id = $2",
@@ -338,7 +402,12 @@ pub async fn update(
     .execute(&mut conn)
     .await?;
 
-    Ok(Some(res.rows_affected() != 0))
+    // Send back the update time (on success)
+    if res.rows_affected() != 0 {
+        Ok(Some(Some(update_time)))
+    } else {
+        Ok(Some(None))
+    }
 }
 
 /// Deletes the note with the given id for the given user
@@ -379,10 +448,10 @@ pub async fn create(
     mut conn: DbConn,
     user_id: i32,
     note: &CreateNoteInfo,
-) -> Result<i32, sqlx::Error> {
+) -> Result<Note, sqlx::Error> {
     // Insert a new note into the database
     let record = sqlx::query!(
-        "INSERT INTO notes (user_id, content, update_time, title, favourite) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        "INSERT INTO notes (user_id, content, update_time, title, favourite) VALUES ($1, $2, $3, $4, $5) RETURNING *",
         user_id,
         note.content,
         now(),
@@ -392,5 +461,12 @@ pub async fn create(
     .fetch_one(&mut conn)
     .await?; // if fetch_one fails, something went wrong internally and the note wasn't created
 
-    Ok(record.id)
+    Ok(Note::new(
+        record.id,
+        record.title,
+        record.update_time,
+        record.favourite,
+        record.content,
+        record.is_diary,
+    ))
 }

@@ -14,6 +14,11 @@ pub struct PagedResponse<T> {
     more: bool,
 }
 
+#[derive(Serialize)]
+pub struct UpdateResponse {
+    update_time: i64,
+}
+
 /// Creates a new note, returning the ID of the new note
 ///
 /// ### Arguments
@@ -26,7 +31,7 @@ pub async fn create(
     create: Json<CreateNoteInfo>,
     pool: &State<PgPool>,
     user: User,
-) -> status::Custom<Option<Json<i32>>> {
+) -> status::Custom<Option<Json<Note>>> {
     let conn = match db::acquire_conn(pool).await {
         Ok(conn) => conn,
         Err(_) => return status::Custom(Status::InternalServerError, None),
@@ -35,7 +40,7 @@ pub async fn create(
     // Create the note, returning the ID of the created note on success, or an error on failure
     match note::create(conn, user.id, &create).await {
         Err(_) => status::Custom(Status::InternalServerError, None),
-        Ok(id) => status::Custom(Status::Created, Some(Json(id))),
+        Ok(note) => status::Custom(Status::Created, Some(Json(note))),
     }
 }
 
@@ -162,7 +167,7 @@ pub async fn get_overview(
 /// * `status::InternalServerError` when we failed to reach thedb, or couldn't get the notes
 /// * `status::BadRequest` if an invalid pagesize was returned
 /// * `status::Ok` and a json-encoded vector of notes, and a bool for if there's more results on success
-#[get("/?<page>&<page_size>&overview=true")]
+#[get("/overviews?<page>&<page_size>")]
 pub async fn get_overview_many(
     pool: &State<PgPool>,
     user: User,
@@ -182,6 +187,51 @@ pub async fn get_overview_many(
 
     // Fetch and return
     match note::get_overview_many(conn, user.id, page, page_size).await {
+        Ok(notes) => status::Custom(
+            Status::Ok,
+            Some(Json(PagedResponse {
+                data: notes.0,
+                more: notes.1,
+            })),
+        ),
+        Err(_) => status::Custom(Status::InternalServerError, None),
+    }
+}
+
+/// Gets the data for multiple diary notes at once, batched in sizes of page_size
+///
+/// ### Arguments
+///
+/// * `pool` - connections to the db that's storing our notes
+/// * `user` - the user who's making the requeset
+/// * `page` - the numbered page we're hoping to get data for
+/// * `page_size` - how many results in each page
+///
+/// ### Returns
+///
+/// * `status::InternalServerError` when we failed to reach thedb, or couldn't get the notes
+/// * `status::BadRequest` if an invalid pagesize was returned
+/// * `status::Ok` and a json-encoded vector of notes, and a bool for if there's more results on success
+#[get("/diary?<page>&<page_size>")]
+pub async fn get_diary_many(
+    pool: &State<PgPool>,
+    user: User,
+    page: i32,
+    page_size: Option<i32>,
+) -> status::Custom<Option<Json<PagedResponse<Vec<Note>>>>> {
+    let conn = match db::acquire_conn(pool).await {
+        Ok(conn) => conn,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
+    };
+
+    // Validate input parameter
+    let page_size = match note::PageSize::new(page_size.unwrap_or(20)) {
+        Ok(page_size) => page_size,
+        Err(_) => return status::Custom(Status::BadRequest, None),
+    };
+
+    // Fetch and return
+    match note::get_diary_notes(conn, user.id, page, page_size).await {
         Ok(notes) => status::Custom(
             Status::Ok,
             Some(Json(PagedResponse {
@@ -235,17 +285,19 @@ pub async fn update(
     update: Json<UpdateNoteInfo>,
     pool: &State<PgPool>,
     user: User,
-) -> Status {
+) -> status::Custom<Option<Json<UpdateResponse>>> {
     let conn = match db::acquire_conn(pool).await {
         Ok(conn) => conn,
-        Err(_) => return Status::InternalServerError,
+        Err(_) => return status::Custom(Status::InternalServerError, None),
     };
 
     // Perform the update
     match note::update(conn, user.id, note_id, &update).await {
-        Err(_) => Status::InternalServerError, // failed to talk to the db
-        Ok(Some(false)) => Status::InternalServerError, // failed to update
-        Ok(None) => Status::NotFound,          // no such note exists
-        Ok(Some(true)) => Status::Ok,          // success
+        Err(_) => status::Custom(Status::InternalServerError, None), // failed to talk to the db
+        Ok(Some(None)) => status::Custom(Status::InternalServerError, None), // failed to update
+        Ok(None) => status::Custom(Status::NotFound, None),          // no such note exists
+        Ok(Some(Some(update_time))) => {
+            status::Custom(Status::Ok, Some(Json(UpdateResponse { update_time })))
+        }
     }
 }
