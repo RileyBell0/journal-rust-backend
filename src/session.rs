@@ -11,7 +11,6 @@ use sqlx::{PgConnection, PgPool};
 const SESSION_COOKIE_NAME: &str = "session";
 const SESSION_KEY_LEN: usize = 32;
 const SESSION_DEFAULT_EXPIRY_WEEKS: i64 = 4;
-const SESSION_PUBLIC_NAME: &str = "session_pub";
 
 /// Represents a single active session
 /// `key` - The key that uniquely identifies the session
@@ -81,12 +80,6 @@ impl Session {
 
         // Chuck the session cookie into the jar
         jar.add_private(session_cookie);
-        jar.add(
-            Cookie::build(SESSION_PUBLIC_NAME, "authenticated")
-                .http_only(false)
-                .same_site(rocket::http::SameSite::Strict)
-                .finish(),
-        )
     }
 
     /// Removes the session cookie from the user's cookie jar (good for a logout route)
@@ -102,7 +95,6 @@ impl Session {
     pub async fn delete(&self, jar: &CookieJar<'_>, conn: &mut PgConnection) -> bool {
         // Remove it from the jar
         jar.remove_private(Cookie::named(SESSION_COOKIE_NAME));
-        jar.remove(Cookie::named(SESSION_PUBLIC_NAME));
 
         // TRY and remove it from the DB
         self.remove_from_db(conn).await
