@@ -10,6 +10,7 @@ argon2 = "0.5.2"
 async-oauth2 = "0.4.2"
 base64 = "0.21.4"
 chrono = "0.4.31"
+env-file-reader = "0.3.0"
 openssl = "0.10.57"
 redis = "0.23.3"
 rocket = { version = "=0.5.0-rc.3", features = ["secrets", "json"] }

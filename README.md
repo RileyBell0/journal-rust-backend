@@ -15,6 +15,7 @@ https://www.rust-lang.org/tools/install
 
 ## Setup
 
+### Rocket.toml
 You've got to set up a `Rocket.toml` file in the root directory, containing
 something like this
 ```
@@ -29,10 +30,15 @@ certs = "/etc/ssl/server.crt"
 key = "/etc/ssl/server.key"
 ```
 
-You'll also need to make a `.env` file containing the following
+### .env
+You'll also need to make a `.env` file containing a definition for `DATABASE_URL`. 
+
+This one should be a URL, and should look something like postgresql://username@host/dbname
+In my case, it's postgresql://rileybell@localhost/dbname". This is used for
+- SQLX's `query!` macro
+- Connecting to the database itself
+
 ```
-# This one should be a URL, and should look something like postgresql://username@host/dbname
-# In my case, it's postgresql://rileybell@localhost/dbname". This is for sqlx's query! macro
 DATABASE_URL="<REDACTED>"
 ```
 
