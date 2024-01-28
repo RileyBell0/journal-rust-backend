@@ -195,3 +195,18 @@ nginx -s reload
 - Have you generated certificates AND a CA for your device?
 - Have you trusted the CA for your device?
 - Have you entered the paths to the certificates you're using in the configuration files here?
+
+### Building on raspberry pi and getting an openssl error during cargo install
+```bash
+cd /tmp
+
+wget https://www.openssl.org/source/openssl-1.0.1t.tar.gz
+tar xzf openssl-1.0.1t.tar.gz
+export MACHINE=armv7
+export ARCH=arm
+export CC=arm-linux-gnueabihf-gcc
+cd openssl-1.0.1t && ./config shared && make && cd -
+
+export OPENSSL_LIB_DIR=/tmp/openssl-1.0.1t/
+export OPENSSL_INCLUDE_DIR=/tmp/openssl-1.0.1t/include
+```
