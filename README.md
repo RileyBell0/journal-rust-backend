@@ -48,9 +48,28 @@ This uses Postgres as a database. You'll need to install and configure that too.
 
 If you're installing it on the same machine as we're running the rust code on, you won't have much configuring to do, otherwise you'll need to alter some stuff like `listen addresses`.
 
-To connect to the Database, run `sudo -u postgres psql <your db's name (probably rust)>`
+To connect to the Database, run `psql <your db's name (probably rust)>`. If you're on ubuntu, or another user owns the server, run the same command with the prefix `sudo -u postgres` to run said command as `postgres`
 
 If you ever need to dump the schema, run `pg_dump --schema-only rust > schema.sql`
+
+To load the schema we need to perform two steps: Create the database `rust`, then load the schema into the database.
+
+If you need to be the user `postgres` to access the db, prefix the following commands with `sudo -u postgres`.
+
+Step 1: Create the database
+```bash
+# login to the db
+psql
+```
+```sql
+-- Create the rust database
+CREATE DATABASE rust
+```
+
+Step 2: load the schema
+```bash
+psql -f ./data/schema.sql rust
+```
 
 #### Mac
 I'd reccomend downloading [postgresapp](https://postgresapp.com/), at least that's what I use, but really, download whatever you want
