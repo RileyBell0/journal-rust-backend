@@ -18,6 +18,11 @@ https://www.rust-lang.org/tools/install
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
+We also need rust to be nightly for some dependencies, so
+```bash
+rustup default nightly
+```
+
 ### NGINX
 
 #### Ubuntu
