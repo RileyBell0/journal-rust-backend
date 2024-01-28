@@ -84,6 +84,11 @@ sudo apt install postgresql
 
 ## Setup (Configuration)
 
+### Finding your Postgres url (Database url)
+
+[source](https://stackoverflow.com/questions/26332319/finding-local-postgresql-database-url) - `postgres://[user]:[password]@[host]:[port]/[database]`
+
+
 ### Rocket.toml
 First, setup a `Rocket.toml` file in the root directory, containing the following configuration
 ```
@@ -105,7 +110,7 @@ key = "/etc/ssl/server.key"
 `defaults.tls.certs` and `defaults.tls.key` must be paths to your HTTPS key and certificate files trusted by your computer
 
 ### .env
-You'll also need to make a `.env` file containing a definition for `DATABASE_URL`. 
+You'll also need to make a `.env` file containing a definition for `DATABASE_URL`.
 
 This one should be a URL, and should look something like postgresql://username@host/dbname
 In my case, it's postgresql://rileybell@localhost/dbname". This is used for
