@@ -50,6 +50,8 @@ If you're installing it on the same machine as we're running the rust code on, y
 
 To connect to the Database, run `sudo -u postgres psql <your db's name (probably rust)>`
 
+If you ever need to dump the schema, run `pg_dump --schema-only rust > schema.sql`
+
 #### Mac
 I'd reccomend downloading [postgresapp](https://postgresapp.com/), at least that's what I use, but really, download whatever you want
 
@@ -60,8 +62,6 @@ Install postgres
 ```bash
 sudo apt install postgresql
 ```
-
-
 
 ## Setup (Configuration)
 
