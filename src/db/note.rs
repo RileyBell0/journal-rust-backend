@@ -141,7 +141,7 @@ pub async fn get_diary_notes(
         "SELECT id, title, update_time, favourite, content, created_at FROM notes WHERE user_id = $1 AND is_diary = true ORDER BY created_at desc LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
-        page as i64
+        (page as i64) * (page_size.0 as i64)
     )
     .fetch_all(&mut conn)
     .await?;
@@ -245,7 +245,7 @@ pub async fn get_overview_many(
         "SELECT id, title, update_time, favourite, is_diary, created_at FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
-        page as i64
+        (page as i64) * (page_size.0 as i64)
     )
     .fetch_all(&mut conn)
     .await?;
@@ -349,7 +349,7 @@ pub async fn get_many(
         "SELECT id, title, update_time, favourite, content, is_diary, created_at FROM notes WHERE user_id = $1 ORDER BY id LIMIT $2 OFFSET $3",
         user_id,
         (page_size.0 + 1) as i64,
-        page as i64
+        (page as i64) * (page_size.0 as i64)
     )
     .fetch_all(&mut conn)
     .await?;
